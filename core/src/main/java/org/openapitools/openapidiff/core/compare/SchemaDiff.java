@@ -303,6 +303,24 @@ public class SchemaDiff {
     return ofNullable(schema).map(Schema::get$ref).orElse(null);
   }
 
+  private static String getWrappedSchemaRef(Schema<?> schema) {
+    if (!(schema instanceof ComposedSchema)) {
+      return null;
+    }
+    ComposedSchema composedSchema = (ComposedSchema) schema;
+    if (composedSchema.getAnyOf() != null && !composedSchema.getAnyOf().isEmpty()) {
+      return null;
+    }
+    if (composedSchema.getOneOf() != null && !composedSchema.getOneOf().isEmpty()) {
+      return null;
+    }
+    List<Schema> allOf = composedSchema.getAllOf();
+    if (allOf == null || allOf.size() != 1) {
+      return null;
+    }
+    return allOf.get(0).get$ref();
+  }
+
   public DeferredChanged<ChangedSchema> diff(Schema left, Schema right, DiffContext context) {
     return this.diff(new RecursiveSchemaSet(), left, right, context);
   }
@@ -332,9 +350,20 @@ public class SchemaDiff {
     CacheKey key = new CacheKey(getSchemaRef(left), getSchemaRef(right), context);
     if (key.getLeft() != null && key.getRight() != null) {
       return openApiDiff.getDeferredSchemaCache().getOrAddSchema(refSet, key, left, right);
-    } else {
-      return computeDiffForReal(refSet, left, right, context);
     }
+
+    // An allOf-wrapped reference has no $ref of its own, so a cycle built entirely from them never
+    // reaches the guard above and was followed until the stack overflowed.
+    CacheKey wrappedKey =
+        new CacheKey(getWrappedSchemaRef(left), getWrappedSchemaRef(right), context);
+    if (wrappedKey.getLeft() != null && wrappedKey.getRight() != null) {
+      if (refSet.contains(wrappedKey)) {
+        return DeferredChanged.empty();
+      }
+      refSet.put(wrappedKey);
+    }
+
+    return computeDiffForReal(refSet, left, right, context);
   }
 
   public DeferredChanged<ChangedSchema> computeDiffForReal(

@@ -10,6 +10,7 @@ public class RecursiveSchemaTest {
   private final String OPENAPI_DOC1 = "recursive_model_1.yaml";
   private final String OPENAPI_DOC2 = "recursive_model_2.yaml";
   private final String OPENAPI_DOC3 = "recursive_model_3.yaml";
+  private final String OPENAPI_DOC4 = "recursive_allof_model_1.yaml";
 
   @Test
   public void testDiffSame() {
@@ -24,5 +25,10 @@ public class RecursiveSchemaTest {
   @Test
   public void testDiffDifferent() {
     assertOpenApiBackwardIncompatible(OPENAPI_DOC1, OPENAPI_DOC2);
+  }
+
+  @Test
+  public void testDiffSameWithAllOfWrappedCycle() {
+    assertOpenApiAreEquals(OPENAPI_DOC4, OPENAPI_DOC4);
   }
 }
